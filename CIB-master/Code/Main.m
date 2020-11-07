@@ -15,6 +15,7 @@ modelNames = {'CIB','MAHAKIL', 'AdaC2', 'AdaBoost', 'SMOTE', 'RUS', 'None'};
 runs = 30;
 folds = 5;
 
+filePath = '..\Datasets\NASA\';
 savePath = 'E:\Documents\Experiments\CIB\RQ1';
 if ~exist(savePath,'dir')
     mkdir(savePath);
