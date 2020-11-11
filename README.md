@@ -9,6 +9,7 @@ If you're a dataset owner and wish to update any part of it (description, citati
 
 ## Contact
 If you have any problem with our code or have some suggestions, including the future feature, feel free to contact 
-- Haonan Tong (tonghaonan@buaa.edu.cn)
+- Haonan Tong (tonghaonan@buaa.edu.cn) or describe it in Issues.
 
-or describe it in Issues.
+## Note
+Owing to the randomness in the algorithm, the results may have a slight fluctuation compared with that in the paper.
