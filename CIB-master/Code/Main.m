@@ -9,13 +9,15 @@ javaaddpath('.\newEvaluation.jar'); %
 
 
 dataNames= {'CM1.arff','KC1.arff','KC3.arff','MC1.arff','MC2.arff','MW1.arff','PC1.arff','PC2.arff','PC3.arff','PC4.arff','PC5.arff','JM1.arff'};
-perfNames = {'PD','Precision','F1','G_mean','AUC', 'Accuracy','PF','G_measure','MCC','Balance'};
+perfNames = {'PD','Precision','F1','G_mean','AUC', 'Accuracy','PF','G_measure','MCC','Balance','AGF'};
 perfs = cell(1,numel(dataNames));
 modelNames = {'CIB','MAHAKIL', 'AdaC2', 'AdaBoost', 'SMOTE', 'RUS', 'None'};
 runs = 30;
 folds = 5;
 
-filePath = '..\Datasets\NASA\';
+filePath = '..\Datasets\NASA\'; % Set the path of NASA datasets
+% filePath = ''..\Datasets\PROMISE\;
+
 savePath = 'E:\Documents\Experiments\CIB\RQ1';
 if ~exist(savePath,'dir')
     mkdir(savePath);
@@ -27,8 +29,28 @@ for d=1:numel(dataNames)
     
     datafile=[filePath, dataNames{d}];
     
+	% load NASA datasets
     data=loadARFF(datafile);
     data.setClassIndex(data.numAttributes()-1);
+	
+	% % load PROMISE datasets: count data must transform into binary data before using it building classification model!
+	% data=loadARFF(datafile); 
+	% [sources,featureNames,targetNDX,stringVals,relationName] = weka2matlab(data,[]); %{false,true}-->{0,1}
+    % if length(unique(sources(:, end))) > 2  % 如果是计数数据，即因变量是缺陷数目
+        % sources = [sources(:, 1:end-1), double(sources(:, end)>0)];
+        
+        % label = cell(size(sources,1),1);
+        % temp = sources(:,end);
+        % for j=1:size(sources,1)
+            % if (temp(j)==1)
+                % label{j} = 'Yes';
+            % else
+                % label{j} = 'No';
+            % end
+        % end %{0,1}--> {false, true}
+        % data = matlab2weka(relationName, featureNames, [num2cell(sources(:, 1:end-1)),label], length(featureNames), 'descend');
+    % end
+	
     p1=1.0;  p2=1.0;
     nth=40;
     t1=0.9;  t2=0.9;
@@ -37,23 +59,8 @@ for d=1:numel(dataNames)
     %
     import weka.core.Instances;
     import weka.core.Instance;
-    pos=javaObject('weka.core.Instances',data,0);
-    neg=javaObject('weka.core.Instances',data,0);
     
-    
-    for i=0:data.numInstances()-1 % Traverse each sample
-        if(data.instance(i).classValue()==1)
-            neg.add(data.instance(i)); % NOTE: 1 - negative (majority)
-        else
-            pos.add(data.instance(i));
-        end
-    end
-    pos_num=pos.numInstances();
-    neg_num=neg.numInstances();
-    P=(floor(neg_num/pos_num)-1)*100; % 
-    if P==0
-        P = 100;
-    end
+	
 %     P=300;
     cost=P/100+1;
     
@@ -74,21 +81,10 @@ for d=1:numel(dataNames)
     
     for i=1:runs
         disp(['runs:', num2str(i), '/', num2str(runs)]);
-        recall=zeros(8,1);
-        precision=zeros(8,1);
-        f_measure=zeros(8,1);
-        g_mean=zeros(8,1);
-        auc=zeros(8,1);
-        confusionMetrix=zeros(8,4);
-        correctMetrix=zeros(8,4);
-        Accuracy=zeros(8,1);
-        PF=zeros(8,1);
-        G_measure=zeros(8,1);
-        MCC=zeros(8,1);
-        Balance=zeros(8,1);
-        K=false;
+		
+        % K=false;
         
-        rng(i);%rand('seed',0)
+        % rng(i);%rand('seed',0)
         indices = crossvalind('Kfold',pos_num,folds);
         indicess = crossvalind('Kfold',neg_num,folds);
         
@@ -148,7 +144,25 @@ for d=1:numel(dataNames)
                 train.add(neg.instance(r4-1));
                 trainNeg.add(neg.instance(r4-1));
             end
-                
+			
+			% Calculate P 
+			pos=javaObject('weka.core.Instances',train,0);
+			neg=javaObject('weka.core.Instances',train,0);
+			for i=0:train.numInstances()-1 % Traverse each sample
+				if(train.instance(i).classValue()==1)
+					neg.add(train.instance(i)); % NOTE: 1 - negative (majority)
+				else
+					pos.add(train.instance(i));
+				end
+			end
+			pos_num=pos.numInstances();
+			neg_num=neg.numInstances();
+			P=(floor(neg_num/pos_num)-1)*100; % 
+			if P==0
+				P = 100;
+			end
+            
+			
             
             %% CIB
             %     [ train, test ] = sample(traindata);
@@ -162,7 +176,7 @@ for d=1:numel(dataNames)
             CIB_classifier.setOptions(options_CIB);
             try
                 CIB_classifier.buildClassifier(synthetic,bi,train.numInstances(),sort_index,p1,p2,k);
-                a1(j,:) = evaluation_weka_classifier( CIB_classifier,test );
+                a1(j,:) = evaluation_weka_classifier02( CIB_classifier,test );
             catch
                 a1(j,:) = nan(1,numel(perfNames));
             end            
@@ -191,7 +205,7 @@ for d=1:numel(dataNames)
             MAHAKIL_classifier = javaObject(baseClassifier);
             try
                 MAHAKIL_classifier.buildClassifier(wekaOBJ);
-                a2(j,:) = evaluation_weka_classifier( MAHAKIL_classifier,test );
+                a2(j,:) = evaluation_weka_classifier02( MAHAKIL_classifier,test );
             catch
                 a2(j,:) = nan(1,numel(perfNames));
             end
@@ -205,7 +219,7 @@ for d=1:numel(dataNames)
             AdaC2.setOptions(options_AdaC2);
             try
                 AdaC2.buildClassifier(train,cost);
-                a3(j,:) = evaluation_weka_classifier( AdaC2,test );
+                a3(j,:) = evaluation_weka_classifier02( AdaC2,test );
             catch
                 a3(j,:) = nan(1,numel(perfNames));
             end
@@ -217,7 +231,7 @@ for d=1:numel(dataNames)
             AdaBoost.setOptions(options_AdaBoost);
             try
                 AdaBoost.buildClassifier(train);
-                a4(j,:) = evaluation_weka_classifier( AdaBoost,test );
+                a4(j,:) = evaluation_weka_classifier02( AdaBoost,test );
             catch
                 a4(j,:) = nan(1,numel(perfNames));
             end  
@@ -226,7 +240,7 @@ for d=1:numel(dataNames)
             SMOTE_classifier = javaObject(baseClassifier); 
             try
                 SMOTE_classifier.buildClassifier(synthetic);
-                a5(j,:) = evaluation_weka_classifier( SMOTE_classifier,test );
+                a5(j,:) = evaluation_weka_classifier02( SMOTE_classifier,test );
             catch
                 a5(j,:) = nan(1,numel(perfNames));
             end
@@ -247,7 +261,7 @@ for d=1:numel(dataNames)
             RUS_classifier = javaObject(baseClassifier);
             try
                 RUS_classifier.buildClassifier(RUSTrain);
-                a6(j,:) = evaluation_weka_classifier( RUS_classifier,test );
+                a6(j,:) = evaluation_weka_classifier02( RUS_classifier,test );
             catch
                 a6(j,:) = nan(1,numel(perfNames));
             end
@@ -257,7 +271,7 @@ for d=1:numel(dataNames)
             base_classifier = javaObject(baseClassifier);
             try
                 base_classifier.buildClassifier(train);
-                a7(j,:) = evaluation_weka_classifier( base_classifier,test );
+                a7(j,:) = evaluation_weka_classifier02( base_classifier,test );
             catch
                 a7(j,:) = nan(1,numel(perfNames));
             end
